@@ -18,10 +18,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-"""
-Collects the sensor data from the drone
-"""
-
 import logging
 logger = logging.getLogger(__name__)
 
@@ -39,6 +35,9 @@ import paveparser
 #==================================================================================================
 class network (object):
 #==================================================================================================
+    """
+An instance of this class collects the sensor data from the drone and updates the :attr:`image` and :attr:`navdata` attributes of *drone*\.
+    """
 
     def __init__(self,drone):
         wifi_connect(done.ssid)

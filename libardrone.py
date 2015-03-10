@@ -17,19 +17,14 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
-"""
-Python library for the AR.Drone 2.0
-Works on windows and Linux
-Soon to be ported to Python 3
+
 """
 
-# Based on code by Bastian Venthur, jbpassot, adetaylor
-# https://github.com/venthur
-# https://github.com/jbpassot
-# https://github.com/adetaylor
+"""
 
 import logging
-logger = logging.getLogger()
+logger = logging.getLogger(__name__)
+
 import socket
 import struct
 import threading
@@ -46,95 +41,24 @@ ARDRONE_NAVDATA_PORT = 5554
 ARDRONE_VIDEO_PORT = 5555
 ARDRONE_CONTROL_PORT = 5559
 
-# Do these have a special meaning ?
-SESSION_ID = '943dac23'
-USER_ID = '36355d78'
-APP_ID = '21d958e4'
-
-# 0: "Not defined"
-# 131072:  "Landed"
-# 393216:  "Taking-off-Floor"
-# 393217:  "Taking-off-Air"
-# 262144:  "Hovering"
-# 524288:  "Landing"
-# 458752:  "Stabilizing"
-# 196608:  "Moving"
-# 262153 and 196613 and 262155 and 196614 and 458753:  "Undefined"
-ctrl_state_dict={0:0, 131072:1, 393216:2, 393217:3, 262144:4, 524288:5, 458752:6, 196608:7, 262153:8, 196613:9, 262155:10, 196614:11, 458753: 12}
-
-def check_str(v):
-    assert isinstance(v,str)
-    return v
-def check_int(low=None,high=None):
-    def f(v):
-        assert isinstance(v,int)
-        assert low is None or low<=v
-        assert high is None or v<=high
-        return str(v)
-    return f
-def check_bool(v):
-    assert isinstance(v,bool)
-    return 'TRUE' if v else 'FALSE'
-
-config_options = {
-    'custom:session_id': check_str,
-    'custom:profile_id': check_str,
-    'custom:application_id': check_str,
-    'video:bitrate_control_mode': check_int(low=0,high=1),
-    'video:bitrate': check_int(low=1),
-    'video:max_bitrate': check_int(low=1),
-    'video:video_channel': check_int(low=0,high=1),
-    'video:codec_fps': check_int(low=1),
-    'video:video_codec': check_int(),
-    'general:navdata_demo': check_bool,
-    'control:altitutde_max': check_int(low=10,high=100000),
-    }
-# Possible value for video codec:
-# NULL_CODEC    = 0,
-# UVLC_CODEC    = 0x20,       // codec_type value is used for START_CODE
-# P264_CODEC    = 0x40,
-# MP4_360P_CODEC = 0x80,
-# H264_360P_CODEC = 0x81,
-# MP4_360P_H264_720P_CODEC = 0x82,
-# H264_720P_CODEC = 0x83,
-# MP4_360P_SLRS_CODEC = 0x84,
-# H264_360P_SLRS_CODEC = 0x85,
-# H264_720P_SLRS_CODEC = 0x86,
-# H264_AUTO_RESIZE_CODEC = 0x87,    // resolution is automatically adjusted according to bitrate
-# MP4_360P_H264_360P_CODEC = 0x88,
-
 #==================================================================================================
 class ARDrone(object):
-    """ARDrone Class.
-
-    Instantiate this class to control your drone and receive decoded video and navdata.
+    """
+An instance of this class has methods to control the drone's motion. It launches a :class:`network` instance which 
     """
 #==================================================================================================
 
-    def __init__(self, ssid=None, hd=False):
+    def __init__(self,ssid=None,hd=False):
 
+        self.ssid = ssid
         self.seq_nr = 1
         self.timer_t = 0.2
         self.com_watchdog_timer = threading.Timer(self.timer_t, self.commwdg)
         self.lock = threading.Lock()
-        self.speed = 0.2
+        self.speed = 0.2 # initial speed factor
         self.hd = hd
         self.image_shape = (720, 1280, 3) if hd else (360, 640, 3)
-        self.config_ids_string = [SESSION_ID, USER_ID, APP_ID]
-        self.config({
-            'custom:session_id':SESSION_ID,
-            'custom:profile_id':USER_ID,
-            'custom:application_id':APP_ID,
-            'video:bitrate_control_mode':1,
-            'video:video_channel':1,
-            'video:bitrate':500,
-            'video:max_bitrate':500,
-            'video:codec_fps':30,
-            'video:video_codec':0x83 if hd else 0x81,
-            'general:navdata_demo':True,
-            'control:altitude_max':20000,
-            })
-        time.sleep(1.)
+        self.config_ids_string = ['943dac23','36355d78','21d958e4'] # do these have a speial meaning?
         self.image = numpy.zeros(self.image_shape,dtype='uint8')
         self.navdata = dict()
         self.navdata[0] = dict(
@@ -148,8 +72,23 @@ class ARDrone(object):
           vy=0.,
           vz=0.,
           num_frames=0)
-        self.ssid = ssid
+
         self.network = arnetwork.network(self)
+
+        self.config({
+            'custom:session_id':self.config_ids_string[0],
+            'custom:profile_id':self.config_ids_string[1],
+            'custom:application_id':self.config_ids_string[2],
+            'video:bitrate_control_mode':1,
+            'video:video_channel':1,
+            'video:bitrate':500,
+            'video:max_bitrate':500,
+            'video:codec_fps':30,
+            'video:video_codec':'H264_720P_CODEC' if hd else 'H264_360P_CODEC',
+            'general:navdata_demo':True,
+            'control:altitude_max':20000,
+            })
+        time.sleep(1.)
 
     def takeoff(self):
         """Make the drone takeoff."""
@@ -447,3 +386,54 @@ def f2i(f):
     f -- floating point value
     """
     return struct.unpack('i', struct.pack('f', f))[0]
+
+#==================================================================================================
+# Utilities
+#==================================================================================================
+
+def check_str(v):
+    assert isinstance(v,str)
+    return v
+def check_int(low=None,high=None):
+    def f(v):
+        assert isinstance(v,int)
+        assert low is None or low<=v
+        assert high is None or v<=high
+        return str(v)
+    return f
+def check_bool(v):
+    assert isinstance(v,bool)
+    return 'TRUE' if v else 'FALSE'
+class check_vcodec:
+    # Possible value for video codec:
+    NULL_CODEC               = 0
+    UVLC_CODEC               = 0x20 # codec_type value is used for START_CODE
+    P264_CODEC               = 0x40
+    MP4_360P_CODEC           = 0x80
+    H264_360P_CODEC          = 0x81
+    MP4_360P_H264_720P_CODEC = 0x82
+    H264_720P_CODEC          = 0x83
+    MP4_360P_SLRS_CODEC      = 0x84
+    H264_360P_SLRS_CODEC     = 0x85
+    H264_720P_SLRS_CODEC     = 0x86
+    H264_AUTO_RESIZE_CODEC   = 0x87 # resolution is automatically adjusted according to bitrate
+    MP4_360P_H264_360P_CODEC = 0x88
+    @classmethod
+    def __call__(cls,v):
+        assert v[0] != '_'
+        return getattr(cls,v)
+
+config_options = {
+    'custom:session_id': check_str,
+    'custom:profile_id': check_str,
+    'custom:application_id': check_str,
+    'video:bitrate_control_mode': check_int(low=0,high=1),
+    'video:bitrate': check_int(low=1),
+    'video:max_bitrate': check_int(low=1),
+    'video:video_channel': check_int(low=0,high=1),
+    'video:codec_fps': check_int(low=1),
+    'video:video_codec': check_vcodec,
+    'general:navdata_demo': check_bool,
+    'control:altitutde_max': check_int(low=10,high=100000),
+    }
+
