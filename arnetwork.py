@@ -19,7 +19,7 @@
 # THE SOFTWARE.
 
 """
-Collects the feedback from the drone
+Collects the sensor data from the drone
 """
 
 import logging
@@ -57,8 +57,8 @@ class network (object):
 def wifi_connect(ssid):
     logger.info('Scanning wifi networks for SSID=%s...',ssid)
     n = 0
+    pat = re.compile('SSID \d+ : (.+?)',re.MULTILINE)
     while True:
-        pat = re.compile('SSID \d+ : (.+?)',re.MULTILINE)
         x = subprocess.check_output(('netsh','wlan','show','networks'))
         L = pat.findall(x.decode('utf-8'))
         if ssid in L:
